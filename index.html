@@ -1,49 +1,196 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Novetus Server Hub</title>
+  <title>Novetus Master Server Browser</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #0d1117;
-      color: #c9d1d9;
-      text-align: center;
-      padding: 30px;
+      font-family: monospace;
+      background-color: #111;
+      color: #0f0;
+      padding: 20px;
+      margin: 0;
+      height: 100vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #header {
+      width: 90vw;
+      max-width: 800px;
+      margin-bottom: 15px;
+      display: flex;
+      gap: 10px;
+    }
+    button {
+      background-color: #222;
+      color: #0f0;
+      border: 1px solid #0f0;
+      padding: 5px 10px;
+      font-family: monospace;
+      cursor: pointer;
+      width: 120px;
+    }
+    button:hover {
+      background-color: #033;
+    }
+    #server-list {
+      width: 90vw;
+      max-width: 800px;
+      flex-grow: 1;
+    }
+    #headers {
+      display: grid;
+      grid-template-columns: 2fr 3fr 1fr 2fr 2fr 2.5fr;
+      gap: 10px;
+      font-weight: bold;
+      margin-bottom: 5px;
+      border-bottom: 1px solid #0f0;
+      padding-bottom: 5px;
     }
     .server {
-      background: #161b22;
-      margin: 20px auto;
-      padding: 20px;
-      border-radius: 12px;
-      width: 400px;
-      box-shadow: 0 0 10px #00000050;
+      background: #000;
+      border: 1px solid #0f0;
+      margin-bottom: 15px;
+      padding: 10px;
+      display: grid;
+      grid-template-columns: 2fr 3fr 1fr 2fr 2fr 2.5fr;
+      gap: 10px;
+      align-items: center;
     }
-    a {
-      color: #58a6ff;
-      text-decoration: none;
-      font-weight: bold;
+    .server div {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    input[readonly] {
+      background: #222;
+      border: 1px solid #0f0;
+      color: #0f0;
+      padding: 5px;
+      font-family: monospace;
+      font-size: 14px;
+      width: 100%;
+      user-select: all;
     }
   </style>
 </head>
 <body>
-  <h1>🌐 Novetus Server Hub</h1>
-  <p>Click a server below to join it in Novetus:</p>
+  <h2>Novetus Master Server Browser</h2>
 
-  <div class="server">
-    <h2>🖥️ RetroCity</h2>
-    <p>Version: 2008M</p>
-    <p>Host: machine-agrees.gl.at.ply.gg:53640</p>
-    <p><a href="roblox-player:1+launchmode:play+gameinfo:machine-agrees.gl.at.ply.gg:53640+version:2008M">Join Server</a></p>
+  <div id="header">
+    <button id="refresh-btn">Refresh Servers</button>
+    <button id="host-btn">Host Server</button>
   </div>
 
-  <div class="server">
-    <h2>🖥️ OldDaysRP</h2>
-    <p>Version: 2009E</p>
-    <p>Host: coolserver.ddns.net:53640</p>
-    <p><a href="roblox-player:1+launchmode:play+gameinfo:coolserver.ddns.net:53640+version:2009E">Join Server</a></p>
+  <div id="headers">
+    <div>Server Name</div>
+    <div>Server Address</div>
+    <div>Port</div>
+    <div>Client Version</div>
+    <div>Map Name</div>
+    <div>Join</div>
   </div>
 
-  <p>Want to list your server? Contact the owner.</p>
+  <div id="server-list"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+  // Your Firebase config
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    databaseURL: "https://bloxxerz-2827b-default-rtdb.firebaseio.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  const serverListDiv = document.getElementById('server-list');
+  const refreshBtn = document.getElementById('refresh-btn');
+  const hostBtn = document.getElementById('host-btn');
+
+  hostBtn.addEventListener('click', () => {
+    window.open("https://forms.gle/xdufD1mrvUDVymy27", "_blank");
+  });
+
+  refreshBtn.addEventListener('click', loadServers);
+
+  function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+      alert("Copied to clipboard:\n" + text);
+    });
+  }
+
+  function openURI(uri) {
+    window.location.href = uri;
+  }
+
+  function renderServers(serversObj) {
+    serverListDiv.innerHTML = '';
+
+    for (const name in serversObj) {
+      const val = serversObj[name];
+      // val format: "address,port,version,map,URI"
+      const parts = val.split(',');
+      if(parts.length < 5) continue;
+
+      const [address, port, version, map, uri] = parts;
+
+      const div = document.createElement('div');
+      div.className = 'server';
+
+      div.innerHTML = `
+        <div title="${name}">${name}</div>
+        <div title="${address}">${address}</div>
+        <div>${port}</div>
+        <div>${version}</div>
+        <div>${map}</div>
+        <div style="display:flex; gap:5px; align-items:center;">
+          <input type="text" readonly value="${uri}" />
+          <button class="launch-btn" data-uri="${uri}">Launch</button>
+          <button class="copy-btn" data-copy="${address}">Copy</button>
+        </div>
+      `;
+
+      serverListDiv.appendChild(div);
+    }
+
+    document.querySelectorAll('.launch-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        openURI(btn.getAttribute('data-uri'));
+      });
+    });
+
+    document.querySelectorAll('.copy-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        copyToClipboard(btn.getAttribute('data-copy'));
+      });
+    });
+  }
+
+  function loadServers() {
+    serverListDiv.innerHTML = 'Loading servers...';
+    // Read from root directly, no "Servers" node
+    db.ref('/').once('value').then(snapshot => {
+      const serversObj = snapshot.val();
+      if (!serversObj) {
+        serverListDiv.innerHTML = 'No servers found.';
+        return;
+      }
+      renderServers(serversObj);
+    }).catch(err => {
+      serverListDiv.innerHTML = 'Failed to load servers.';
+      console.error(err);
+    });
+  }
+
+  loadServers();
+</script>
 </body>
 </html>
