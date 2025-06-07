@@ -1,24 +1,25 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Novetus Master Server Browser</title>
   <style>
     body {
       font-family: monospace;
       background-color: #111;
       color: #0f0;
-      padding: 20px;
       margin: 0;
-      height: 100vh;
-      overflow-y: auto;
+      padding: 20px;
       display: flex;
       flex-direction: column;
       align-items: center;
+      min-height: 100vh;
     }
-    #header {
+    #buttons {
+      margin-bottom: 15px;
       width: 90vw;
       max-width: 800px;
-      margin-bottom: 15px;
       display: flex;
       gap: 10px;
     }
@@ -26,171 +27,159 @@
       background-color: #222;
       color: #0f0;
       border: 1px solid #0f0;
-      padding: 5px 10px;
+      padding: 6px 12px;
       font-family: monospace;
       cursor: pointer;
-      width: 120px;
+      user-select: none;
     }
     button:hover {
       background-color: #033;
     }
-    #server-list {
-      width: 90vw;
-      max-width: 800px;
-      flex-grow: 1;
-    }
     #headers {
       display: grid;
-      grid-template-columns: 2fr 3fr 1fr 2fr 2fr 2.5fr;
+      grid-template-columns: 2fr 3fr 1fr 2fr 2fr 2fr;
       gap: 10px;
       font-weight: bold;
       margin-bottom: 5px;
-      border-bottom: 1px solid #0f0;
+      border-bottom: 2px solid #0f0;
       padding-bottom: 5px;
+      width: 90vw;
+      max-width: 800px;
+    }
+    #server-list {
+      width: 90vw;
+      max-width: 800px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex-grow: 1;
     }
     .server {
       background: #000;
       border: 1px solid #0f0;
-      margin-bottom: 15px;
       padding: 10px;
       display: grid;
-      grid-template-columns: 2fr 3fr 1fr 2fr 2fr 2.5fr;
+      grid-template-columns: 2fr 3fr 1fr 2fr 2fr 2fr;
       gap: 10px;
       align-items: center;
+      overflow: hidden;
     }
     .server div {
       overflow: hidden;
       white-space: nowrap;
       text-overflow: ellipsis;
     }
-    input[readonly] {
-      background: #222;
-      border: 1px solid #0f0;
-      color: #0f0;
-      padding: 5px;
-      font-family: monospace;
-      font-size: 14px;
-      width: 100%;
-      user-select: all;
-    }
   </style>
 </head>
 <body>
   <h2>Novetus Master Server Browser</h2>
 
-  <div id="header">
-    <button id="refresh-btn">Refresh Servers</button>
-    <button id="host-btn">Host Server</button>
+  <div id="buttons">
+    <button id="host-server-btn">Host Server</button>
+    <button id="refresh-btn">Refresh</button>
   </div>
 
   <div id="headers">
     <div>Server Name</div>
-    <div>Server Address</div>
+    <div>Address</div>
     <div>Port</div>
-    <div>Client Version</div>
-    <div>Map Name</div>
+    <div>Version</div>
+    <div>Map</div>
     <div>Join</div>
   </div>
 
   <div id="server-list"></div>
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script>
-  // Your Firebase config
-  const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    databaseURL: "https://bloxxerz-2827b-default-rtdb.firebaseio.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
-  };
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
+  <script>
+    // Your Firebase config here
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      databaseURL: "https://bloxxerz-2827b-default-rtdb.firebaseio.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_STORAGE_BUCKET",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
 
-  const serverListDiv = document.getElementById('server-list');
-  const refreshBtn = document.getElementById('refresh-btn');
-  const hostBtn = document.getElementById('host-btn');
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
 
-  hostBtn.addEventListener('click', () => {
-    window.open("https://forms.gle/xdufD1mrvUDVymy27", "_blank");
-  });
+    const serverListDiv = document.getElementById("server-list");
+    const hostServerBtn = document.getElementById("host-server-btn");
+    const refreshBtn = document.getElementById("refresh-btn");
 
-  refreshBtn.addEventListener('click', loadServers);
-
-  function copyToClipboard(text) {
-    navigator.clipboard.writeText(text).then(() => {
-      alert("Copied to clipboard:\n" + text);
-    });
-  }
-
-  function openURI(uri) {
-    window.location.href = uri;
-  }
-
-  function renderServers(serversObj) {
-    serverListDiv.innerHTML = '';
-
-    for (const name in serversObj) {
-      const val = serversObj[name];
-      // val format: "address,port,version,map,URI"
-      const parts = val.split(',');
-      if(parts.length < 5) continue;
-
-      const [address, port, version, map, uri] = parts;
-
-      const div = document.createElement('div');
-      div.className = 'server';
-
-      div.innerHTML = `
-        <div title="${name}">${name}</div>
-        <div title="${address}">${address}</div>
-        <div>${port}</div>
-        <div>${version}</div>
-        <div>${map}</div>
-        <div style="display:flex; gap:5px; align-items:center;">
-          <input type="text" readonly value="${uri}" />
-          <button class="launch-btn" data-uri="${uri}">Launch</button>
-          <button class="copy-btn" data-copy="${address}">Copy</button>
-        </div>
-      `;
-
-      serverListDiv.appendChild(div);
+    function parseServerString(str) {
+      // Format: address,port,version,map,URI
+      const parts = str.split(",");
+      return {
+        address: parts[0] || "",
+        port: parts[1] || "",
+        version: parts[2] || "",
+        map: parts[3] || "",
+        uri: parts.slice(4).join(",") || "" // In case URI contains commas
+      };
     }
 
-    document.querySelectorAll('.launch-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        openURI(btn.getAttribute('data-uri'));
-      });
-    });
+    function openURIInNewTab(uri) {
+      window.open(uri, "_blank", "noopener");
+    }
 
-    document.querySelectorAll('.copy-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        copyToClipboard(btn.getAttribute('data-copy'));
-      });
-    });
-  }
+    function renderServers(servers) {
+      serverListDiv.innerHTML = "";
+      for (const [name, value] of Object.entries(servers)) {
+        const { address, port, version, map, uri } = parseServerString(value);
 
-  function loadServers() {
-    serverListDiv.innerHTML = 'Loading servers...';
-    // Read from root directly, no "Servers" node
-    db.ref('/').once('value').then(snapshot => {
-      const serversObj = snapshot.val();
-      if (!serversObj) {
-        serverListDiv.innerHTML = 'No servers found.';
-        return;
+        const div = document.createElement("div");
+        div.className = "server";
+
+        div.innerHTML = `
+          <div title="${name}">${name}</div>
+          <div title="${address}">${address}</div>
+          <div>${port}</div>
+          <div>${version}</div>
+          <div title="${map}">${map}</div>
+          <div>
+            <button onclick='openURIInNewTab("${uri.replace(/"/g, "&quot;")}")'>Launch</button>
+          </div>
+        `;
+
+        serverListDiv.appendChild(div);
       }
-      renderServers(serversObj);
-    }).catch(err => {
-      serverListDiv.innerHTML = 'Failed to load servers.';
-      console.error(err);
-    });
-  }
+    }
 
-  loadServers();
-</script>
+    function loadServers() {
+      serverListDiv.innerHTML = "Loading servers...";
+      database.ref("/").once("value")
+        .then(snapshot => {
+          const servers = snapshot.val();
+          if (!servers) {
+            serverListDiv.innerHTML = "No servers found.";
+            return;
+          }
+          renderServers(servers);
+        })
+        .catch(err => {
+          serverListDiv.innerHTML = "Failed to load servers.";
+          console.error(err);
+        });
+    }
+
+    hostServerBtn.addEventListener("click", () => {
+      window.open("https://forms.gle/xdufD1mrvUDVymy27", "_blank", "noopener");
+    });
+
+    refreshBtn.addEventListener("click", () => {
+      loadServers();
+    });
+
+    // Initial load
+    loadServers();
+  </script>
 </body>
 </html>
