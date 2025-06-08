@@ -1,185 +1,144 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Novetus Master Server Browser</title>
   <style>
     body {
       font-family: monospace;
       background-color: #111;
       color: #0f0;
-      margin: 0;
       padding: 20px;
+      margin: 0;
       display: flex;
       flex-direction: column;
       align-items: center;
-      min-height: 100vh;
     }
-    #buttons {
-      margin-bottom: 15px;
-      width: 90vw;
-      max-width: 800px;
+    #top-buttons {
       display: flex;
       gap: 10px;
+      margin-bottom: 15px;
     }
     button {
       background-color: #222;
       color: #0f0;
       border: 1px solid #0f0;
-      padding: 6px 12px;
+      padding: 5px 10px;
       font-family: monospace;
       cursor: pointer;
-      user-select: none;
     }
     button:hover {
       background-color: #033;
     }
     #headers {
       display: grid;
-      grid-template-columns: 2fr 3fr 1fr 2fr 2fr 2fr;
+      grid-template-columns: 2fr 3fr 1fr 2fr 2fr 1.5fr;
       gap: 10px;
       font-weight: bold;
-      margin-bottom: 5px;
-      border-bottom: 2px solid #0f0;
+      border-bottom: 1px solid #0f0;
       padding-bottom: 5px;
       width: 90vw;
-      max-width: 800px;
+      max-width: 1000px;
     }
     #server-list {
       width: 90vw;
-      max-width: 800px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      flex-grow: 1;
+      max-width: 1000px;
     }
     .server {
       background: #000;
       border: 1px solid #0f0;
+      margin-top: 10px;
       padding: 10px;
       display: grid;
-      grid-template-columns: 2fr 3fr 1fr 2fr 2fr 2fr;
+      grid-template-columns: 2fr 3fr 1fr 2fr 2fr 1.5fr;
       gap: 10px;
       align-items: center;
-      overflow: hidden;
     }
-    .server div {
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
+    .address-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 5px;
     }
   </style>
 </head>
 <body>
   <h2>Novetus Master Server Browser</h2>
 
-  <div id="buttons">
-    <button id="host-server-btn">Host Server</button>
-    <button id="refresh-btn">Refresh</button>
+  <div id="top-buttons">
+    <button onclick="fetchServers()">Refresh</button>
+    <button onclick="window.open('https://forms.gle/xdufD1mrvUDVymy27', '_blank')">Host Server</button>
   </div>
 
   <div id="headers">
     <div>Server Name</div>
-    <div>Address</div>
+    <div>Server Address</div>
     <div>Port</div>
-    <div>Version</div>
-    <div>Map</div>
+    <div>Client Version</div>
+    <div>Map Name</div>
     <div>Join</div>
   </div>
 
-  <div id="server-list"></div>
-
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <div id="server-list">Loading servers...</div>
 
   <script>
-    // Your Firebase config here
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_AUTH_DOMAIN",
-      databaseURL: "https://bloxxerz-2827b-default-rtdb.firebaseio.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_STORAGE_BUCKET",
-      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-      appId: "YOUR_APP_ID"
-    };
+    async function fetchServers() {
+      const serverListDiv = document.getElementById("server-list");
+      serverListDiv.innerHTML = "Loading servers...";
 
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    const database = firebase.database();
+      try {
+        const res = await fetch("https://bloxxerz-2827b-default-rtdb.firebaseio.com/.json");
+        const data = await res.json();
 
-    const serverListDiv = document.getElementById("server-list");
-    const hostServerBtn = document.getElementById("host-server-btn");
-    const refreshBtn = document.getElementById("refresh-btn");
+        if (!data) {
+          serverListDiv.innerHTML = "No servers found.";
+          return;
+        }
 
-    function parseServerString(str) {
-      // Format: address,port,version,map,URI
-      const parts = str.split(",");
-      return {
-        address: parts[0] || "",
-        port: parts[1] || "",
-        version: parts[2] || "",
-        map: parts[3] || "",
-        uri: parts.slice(4).join(",") || "" // In case URI contains commas
-      };
-    }
+        serverListDiv.innerHTML = "";
 
-    function openURIInNewTab(uri) {
-      window.open(uri, "_blank", "noopener");
-    }
+        Object.entries(data).forEach(([name, value]) => {
+          const [address, port, version, map, uri] = value.split(',');
 
-    function renderServers(servers) {
-      serverListDiv.innerHTML = "";
-      for (const [name, value] of Object.entries(servers)) {
-        const { address, port, version, map, uri } = parseServerString(value);
-
-        const div = document.createElement("div");
-        div.className = "server";
-
-        div.innerHTML = `
-          <div title="${name}">${name}</div>
-          <div title="${address}">${address}</div>
-          <div>${port}</div>
-          <div>${version}</div>
-          <div title="${map}">${map}</div>
-          <div>
-            <button onclick='openURIInNewTab("${uri.replace(/"/g, "&quot;")}")'>Launch</button>
-          </div>
-        `;
-
-        serverListDiv.appendChild(div);
+          const div = document.createElement("div");
+          div.className = "server";
+          div.innerHTML = `
+            <div title="${name}">${name}</div>
+            <div class="address-wrapper">
+              <span title="${address}">${address}</span>
+              <button onclick="copyToClipboard('${address}')">Copy</button>
+            </div>
+            <div>${port}</div>
+            <div>${version}</div>
+            <div>${map}</div>
+            <div>
+              <button onclick="openURI('${uri}')">Launch</button>
+            </div>
+          `;
+          serverListDiv.appendChild(div);
+        });
+      } catch (e) {
+        serverListDiv.innerHTML = "Failed to load servers.";
+        console.error("Error fetching servers:", e);
       }
     }
 
-    function loadServers() {
-      serverListDiv.innerHTML = "Loading servers...";
-      database.ref("/").once("value")
-        .then(snapshot => {
-          const servers = snapshot.val();
-          if (!servers) {
-            serverListDiv.innerHTML = "No servers found.";
-            return;
-          }
-          renderServers(servers);
-        })
-        .catch(err => {
-          serverListDiv.innerHTML = "Failed to load servers.";
-          console.error(err);
-        });
+    function openURI(uri) {
+      const a = document.createElement("a");
+      a.href = uri;
+      a.target = "_blank";
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
 
-    hostServerBtn.addEventListener("click", () => {
-      window.open("https://forms.gle/xdufD1mrvUDVymy27", "_blank", "noopener");
-    });
-
-    refreshBtn.addEventListener("click", () => {
-      loadServers();
-    });
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        alert("Copied to clipboard:\n" + text);
+      });
+    }
 
     // Initial load
-    loadServers();
+    fetchServers();
   </script>
 </body>
 </html>
